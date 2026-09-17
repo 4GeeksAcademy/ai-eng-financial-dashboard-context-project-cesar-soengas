@@ -29,8 +29,7 @@
 ```ts
 interface DateRangeFilterProps {
   value: DateRangeFilter
-  minDate?: ApiDateString
-  maxDate?: ApiDateString
+  facets?: FacetsResponse
   disabled?: boolean
   onChange: (value: DateRangeFilter) => void
   onApply?: () => void
@@ -45,7 +44,8 @@ interface DateRangeFilterProps {
 - No emitir una petición desde el componente. Solo comunicar cambios mediante `onChange` y, si se usa, `onApply`.
 - Impedir aplicar un rango en el que `start_date > end_date`.
 - Mostrar un mensaje accesible para fechas inválidas, incompletas o inconsistentes.
-- `minDate` y `maxDate` son límites de selección derivados de `FacetsResponse`; no deben confundirse con `start_date` y `end_date` enviados a la API.
+- `facets.min_date` y `facets.max_date` son límites de selección derivados de `FacetsResponse`; no deben confundirse con `start_date` y `end_date` enviados a la API.
+- Como `FacetsResponse.min_date` y `FacetsResponse.max_date` están tipados como `string`, el componente o su adaptador debe validarlos antes de usarlos como valores de un `<input type="date">`; no se debe afirmar que son `ApiDateString` sin esa validación.
 - Asociar cada `<label>` con su control y exponer el error mediante `aria-describedby` y `aria-invalid`.
 
 **Estados:**
@@ -111,7 +111,7 @@ interface DashboardDataStateProps {
 ```ts
 interface AnomalyAlertsSectionProps {
   dateRange: DateRangeFilter
-  onRequestError?: (error: Error) => void
+  onRetry?: () => void
 }
 ```
 
@@ -124,6 +124,8 @@ interface AnomalyAlertsSectionProps {
 - No enviar valores de umbral incompletos, no numéricos o fuera del rango funcional `0.01–1.0`.
 - Mantener la sección visible cuando la respuesta sea `[]`.
 - Aislar sus errores del estado de KPIs y gráficos del dashboard.
+- `dateRange` es el único rango recibido; la sección no mantiene una copia paralela.
+- `onRetry` reintenta la última consulta válida y no cambia el rango ni el umbral.
 
 **Estados:**
 
@@ -143,8 +145,6 @@ interface AnomalyAlertsSectionProps {
 ```ts
 interface AlertThresholdControlProps {
   value: number
-  min: number
-  max: number
   disabled?: boolean
   onChange: (value: number) => void
 }
@@ -156,6 +156,7 @@ interface AlertThresholdControlProps {
 - Rango funcional: `0.01` a `1.0`, ambos inclusive.
 - Mostrar ayuda: `0.3 = 30%`.
 - No llamar a `onChange` para valores vacíos o inválidos.
+- Los límites no se reciben como props porque son una regla fija de esta funcionalidad: `0.01 <= threshold <= 1.0`.
 - El valor visible debe diferenciar el ratio decimal del porcentaje presentado.
 - La etiqueta será `Umbral de incremento` y el mensaje de error debe estar asociado al input.
 
@@ -201,7 +202,9 @@ interface AnomalyAlertsTableProps {
 
 ```ts
 interface BusinessComparisonPageProps {
-  initialDateRange?: DateRangeFilter
+  dateRange?: DateRangeFilter
+  facets?: FacetsResponse
+  onDateRangeChange?: (value: DateRangeFilter) => void
 }
 ```
 
@@ -209,6 +212,8 @@ interface BusinessComparisonPageProps {
 
 - Mostrar siempre las dos líneas de negocio y en este orden: B2B, B2C.
 - Coordinar la consulta de facetas, las dos consultas de `categories/top` y las dos consultas de movimientos específicos.
+- Si `facets` no se recibe, la página debe solicitar `GET /api/metrics/facets` antes de presentar límites de fecha; no debe hardcodear `min_date`, `max_date` ni categorías.
+- `dateRange` es controlado por el propietario cuando se proporciona; `onDateRangeChange` comunica cambios al propietario. No se deben mantener dos fuentes de verdad.
 - Enviar `operation_type=income` y `limit=5` a `categories/top`.
 - Enviar el mismo rango válido a todas las consultas relevantes.
 - No presentar resultados parciales como una comparación completa.
@@ -241,6 +246,7 @@ interface BusinessIncomeTableProps {
 **Reglas:**
 
 - El `entries` recibido debe proceder de `categories/top` con `operation_type=income`, `business_type` del grupo y `limit=5`.
+- `businessType` es una prop de presentación (`B2B` o `B2C`), no un campo de `TopCategoriesParams` en Fase 2. El adaptador de API debe combinarlo con `TopCategoriesParams` al construir la URL, porque el endpoint real sí acepta `business_type`.
 - No calcular el total del grupo sumando solo las filas visibles.
 - Si `groupIncomeTotal === 0`, mostrar `0.00%` y no producir `NaN` o `Infinity`.
 - Mostrar estado vacío manteniendo el nombre del grupo si no hay ingresos.
@@ -282,7 +288,16 @@ interface BusinessIncomeChartProps {
 | `BusinessIncomeTable` | `GET /api/metrics/categories/top` | `CategoryEntry` | `TopCategoriesParams` |
 | `BusinessIncomeChart` | `/api/metrics/b2b` y `/api/metrics/b2c` | `FinancialMovement[]` | `DateRangeFilter` más `operation_type=income` |
 
-## 6. Accesibilidad y responsive
+## 6. Decisiones cerradas sobre props y parámetros
+
+1. **Propiedad frente a parámetro de API:** `dateRange` se representa con `DateRangeFilter`; `facets` se representa con `FacetsResponse`. La primera contiene filtros opcionales y la segunda contiene metadatos/catálogo.
+2. **Fechas de facetas:** `min_date` y `max_date` solo limitan los controles. No se envían automáticamente como `start_date` y `end_date`; si el usuario deja el rango vacío, la consulta no incluye fechas.
+3. **Umbral:** `AlertThresholdControl` usa siempre `0.01–1.0` y `0.3` como valor inicial. No se exponen `min`/`max` configurables porque el brief no define variantes de esta regla.
+4. **Rango en alertas:** `AnomalyAlertsSection` recibe el rango compartido y construye `AlertsParams`; no crea un selector propio.
+5. **B2B/B2C:** `BusinessComparisonPage` muestra exactamente ambos grupos. `BusinessIncomeTable.businessType` identifica la tabla, mientras que el adaptador añade el filtro `business_type` verificado por OpenAPI a la petición de `categories/top`.
+6. **Parámetros no modelados en Fase 2:** `group_by=month` para alertas y `business_type` para categorías son constantes/filtros de integración descritos en la spec de componentes; no se duplican como props de UI ni se inventan respuestas nuevas.
+
+## 7. Accesibilidad y responsive
 
 - Cada control de fecha y umbral tendrá una etiqueta visible asociada.
 - Los errores de validación se expondrán mediante texto y relaciones ARIA apropiadas.
@@ -292,7 +307,7 @@ interface BusinessIncomeChartProps {
 - En pantallas estrechas, las tablas usarán contenedor con desplazamiento horizontal; el layout general no desbordará el viewport.
 - Se respetarán las variables de tema existentes para mantener contraste en modo oscuro.
 
-## 7. Fuera de alcance de esta fase
+## 8. Fuera de alcance de esta fase
 
 - Implementar los componentes.
 - Modificar endpoints o modelos backend.
