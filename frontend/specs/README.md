@@ -19,6 +19,10 @@ Este documento describe únicamente el contrato verificado para las tres funcion
 - `Category` solo admite `suppliers`, `sales`, `operational`, `administrative` y `others`.
 - `BusinessType` solo admite `B2B` y `B2C`.
 - Los importes y ratios se reciben como `number`; la moneda y el porcentaje son responsabilidad de la presentación.
+- FastAPI serializa los campos `date` de las respuestas como cadenas ISO `YYYY-MM-DD`; el frontend no debe depender de la zona horaria del navegador para interpretarlos.
+- La URL base de las peticiones es relativa (`/api/...`) para usar el proxy de Vite; no se construyen URLs absolutas en los componentes.
+- Una respuesta HTTP no exitosa, un fallo de red o una respuesta que no pueda validarse como el tipo esperado se trata como **Error**, nunca como una respuesta vacía.
+- Las peticiones se vuelven a ejecutar cuando cambia el rango válido o un filtro aplicable. Mientras llega la nueva respuesta se muestra **Carga** y no se mezclan datos de rangos distintos.
 
 Tipos compartidos usados en las firmas:
 
@@ -88,6 +92,10 @@ Parámetros verificados:
 
 Si no se envían fechas, se consulta todo el período disponible. El frontend debe rechazar un rango en el que `start_date > end_date` antes de construir la URL. El endpoint no acepta `business_type`.
 
+La selección inicial no tiene rango activo: ambos controles comienzan vacíos y la primera petición omite `start_date` y `end_date`. Las facetas solo limitan los controles (`min_date` y `max_date`); no se copian automáticamente como valores seleccionados. Si el usuario borra un rango, se vuelve a este estado sin filtro.
+
+Al construir cualquier query string, se omiten los parámetros `undefined`, `null` y vacíos. Los valores se codifican con `URLSearchParams` y se envían con los nombres exactos del contrato (`start_date`, `end_date`, `category` y `operation_type`).
+
 ### 2.2 Campos de respuesta
 
 `FinancialMovement` contiene:
@@ -123,6 +131,8 @@ interface FacetsResponse {
 3. **Rango válido sin movimientos:** `/api/metrics` devuelve `[]`. La UI mantiene el dashboard visible, muestra KPIs en cero o un estado “Sin movimientos en el rango seleccionado”, y no presenta un error de red.
 4. **Error de facetas o de movimientos:** se muestra un estado de error con opción de reintento. Si falla una consulta, no se debe presentar como si hubiera datos completos; el texto debe distinguir error de estado vacío.
 
+En el primer render, si todavía no existe un rango válido anterior, un rango inválido deja los controles con los valores introducidos para que puedan corregirse, pero no renderiza datos como si fueran válidos. Tras haber cargado datos correctamente, un rango inválido conserva visualmente y en pantalla los últimos resultados válidos.
+
 ## 3. Funcionalidad 2 — Alertas de anomalías
 
 ### 3.1 Endpoint consumido
@@ -139,7 +149,7 @@ type GetAlertsRequest = AlertsParams & {
 type GetAlertsResponse = AlertResponse
 ```
 
-La especificación de componentes usa `group_by=month` explícitamente. `business_type` es un filtro real del endpoint, pero no es una prop obligatoria de la sección de alertas.
+La sección siempre envía `group_by=month` explícitamente. No ofrece un selector de agrupación ni envía `day` o `week`. `business_type` es un filtro real del endpoint y, si existe un filtro global activo, se propaga; si no existe, se omite.
 
 Parámetros verificados:
 
@@ -179,9 +189,15 @@ La regla funcional solicita una media de los tres períodos anteriores. La imple
 3. **Umbral vacío, no numérico o fuera de `0.01–1.0`:** no se ejecuta una petición con ese valor. El control muestra validación accesible y conserva el último valor válido, normalmente `0.3`.
 4. **Error HTTP o de red:** la sección permanece en la página con un mensaje de error y botón de reintento, sin ocultar ni marcar como fallidos los KPIs y gráficos que sí hayan cargado.
 
+El umbral se mantiene en estado local de la sección. Su valor inicial es `0.3`, se muestra como porcentaje (`30%`) si la UI usa un control porcentual, y se convierte a ratio decimal antes de llamar a la API. La petición solo se dispara con un valor numérico entre `0.01` y `1.0`, inclusive; durante una edición inválida se conserva el último valor válido y no se realiza una petición.
+
 ## 4. Funcionalidad 3 — Comparativa B2B vs B2C
 
 La vista muestra siempre ambos grupos, en el orden B2B y B2C. Usa el mismo rango válido para todas las consultas.
+
+La vista ejecuta las cinco peticiones necesarias con el mismo snapshot de filtros: una a `/api/metrics/facets`, dos a `/api/metrics/categories/top` y una a cada endpoint de movimientos (`/api/metrics/b2b` y `/api/metrics/b2c`). Las peticiones de categorías incluyen `operation_type=income`, `limit=5` y el `business_type` correspondiente. Las peticiones de movimientos incluyen `operation_type=income`; no incluyen `business_type`, porque el endpoint ya fija el grupo.
+
+Si no hay rango activo, todas las peticiones omiten `start_date` y `end_date`. Si el rango es inválido, no se ejecuta ninguna de las cinco peticiones. Si falla cualquiera de las peticiones de la comparación, la vista completa se marca como error de comparación y no muestra una combinación de resultados parciales.
 
 ### 4.1 Endpoints consumidos
 
@@ -280,6 +296,8 @@ const percentage = groupIncomeTotal > 0
 4. **Rango sin datos o rango inválido:** para un rango válido sin movimientos se muestra estado vacío coordinado, no error. Si `start_date > end_date`, no se consulta ningún endpoint y el selector muestra un error accesible conservando los últimos resultados válidos.
 5. **Fallo parcial de comparación:** si falla una de las peticiones de categorías o movimientos, la UI muestra error de comparación y no presenta datos parciales como comparación completa. Un fallo de facetas debe identificarse separadamente porque impide establecer los límites/catálogos.
 
+El filtro global `business_type`, si se ofrece en la aplicación, no se aplica a esta vista: la comparación debe mostrar siempre B2B y B2C. El filtro de categoría tampoco se aplica a los endpoints de esta sección, porque cambiaría el significado de `groupIncomeTotal`; las tablas siempre comparan todas las categorías de ingresos.
+
 ## 5. Endpoints verificados no consumidos por el flujo actual
 
 Los siguientes endpoints existen en OpenAPI, pero no forman parte de las peticiones seleccionadas para las tres funcionalidades descritas:
@@ -363,5 +381,15 @@ Cada funcionalidad debe diferenciar visualmente y mediante texto:
 - **Datos:** contenido completo asociado al rango aplicado.
 - **Vacío:** respuesta válida sin resultados; no debe tratarse como error.
 - **Error:** fallo HTTP, de red o de validación; debe incluir un mensaje comprensible y reintento cuando proceda.
+
+Los mensajes mínimos de error son: `No se pudieron cargar los datos del dashboard.`, `No se pudieron cargar las alertas.` y `No se pudo cargar la comparación B2B/B2C.`. El botón de reintento repite la última consulta válida con los mismos parámetros. Un resultado `[]` nunca activa esos mensajes.
+
+## 9. Criterios de implementación cerrados
+
+- La capa de integración es responsable de construir las URLs, validar rangos y umbrales, convertir respuestas JSON a los tipos de `frontend/specs/` y exponer estados `loading`, `data`, `empty` y `error`.
+- Los componentes no llaman directamente a endpoints distintos de los enumerados en este documento.
+- Los cálculos derivados se redondean únicamente al presentar: importes con dos decimales, porcentajes con dos decimales y ratios de alertas como porcentaje multiplicado por 100.
+- Los resultados se consideran completos solo cuando han terminado correctamente todas las peticiones requeridas por la funcionalidad.
+- No se añaden fallbacks con `mock-data.ts`, datos hardcodeados ni categorías ficticias cuando una respuesta está vacía o falla.
 
 La implementación de componentes, cambios backend y correcciones de la validación de `threshold` quedan fuera de este documento de contrato.
