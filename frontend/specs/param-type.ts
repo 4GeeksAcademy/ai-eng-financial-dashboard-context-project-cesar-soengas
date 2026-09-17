@@ -1,7 +1,9 @@
 import type { OperationType } from "@/lib/financial-types"
 
+type DateDigit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+
 /** ISO calendar date used by the API query parameters (YYYY-MM-DD). */
-export type ApiDateString = string
+export type ApiDateString = `${DateDigit}${DateDigit}${DateDigit}${DateDigit}-${DateDigit}${DateDigit}-${DateDigit}${DateDigit}`
 
 /** Optional inclusive date range shared by the API queries. */
 export interface DateRangeFilter {
