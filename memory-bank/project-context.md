@@ -46,6 +46,41 @@ Dashboard renders KPIs + Charts
 6. **Always include `response_model`** in backend endpoints
 7. **Keep types in sync** — `FinancialMovement` exists in both Python and TypeScript
 
+## Justificación de la skill SEO
+
+Se eligió la skill `seo` porque el proyecto es un dashboard React/Vite público que
+necesita presentar correctamente su contenido tanto a usuarios como a motores de
+búsqueda. La skill proporciona una revisión técnica alineada con Lighthouse y las
+guías de Google, sin limitarse a palabras clave o contenido de marketing:
+
+> **Optimización SEO técnica que abarca la rastreabilidad, los elementos de la
+> página, los datos estructurados y las mejores prácticas para dispositivos
+> móviles.**
+
+La elección es relevante para este repositorio por los siguientes motivos:
+
+- **Rastreabilidad:** permite revisar `robots.txt`, directivas `meta robots`, URLs
+  canónicas, sitemap y el tratamiento de las rutas `/api/`, evitando que los
+  recursos técnicos o endpoints se indexen de forma incorrecta.
+- **Elementos de la página:** ayuda a validar el título, la descripción, el idioma,
+  la jerarquía de encabezados y la semántica del dashboard. Esto es especialmente
+  útil porque la aplicación es una SPA y su contenido inicial se sirve desde
+  `frontend/index.html`.
+- **Datos estructurados:** ofrece criterios y referencias para añadir JSON-LD solo
+  cuando describa contenido visible y preciso, evitando esquemas artificiales que
+  no correspondan a un dashboard financiero.
+- **Dispositivos móviles y rendimiento:** complementa la revisión responsive del
+  frontend con recomendaciones sobre viewport, imágenes, estabilidad visual y
+  recursos cargados. Las conclusiones de Core Web Vitals deben validarse con
+  mediciones reales, no asumirse solo desde el código fuente.
+- **Alcance verificable:** distingue entre problemas técnicos que pueden auditarse
+  localmente y resultados de indexación o posicionamiento que requieren validación
+  posterior en buscadores/Search Console.
+
+La skill se mantiene como guía de auditoría y no implica que el dashboard vaya a
+obtener una posición concreta en resultados de búsqueda. Su objetivo es reducir
+problemas técnicos de descubrimiento, interpretación y experiencia móvil.
+
 ## Common tasks
 
 ### Add a new KPI card

@@ -118,3 +118,17 @@
 | Variable | Default | Description |
 |---|---|---|
 | `VITE_API_BASE_URL` | `""` (uses proxy) | Backend URL for API calls |
+
+## SEO skill
+
+The repository includes `.agents/skills/seo/SKILL.md` to guide technical SEO
+audits for the React/Vite frontend. It was selected because the dashboard needs
+technical optimization covering **crawlability, on-page elements, structured
+data, and mobile best practices**. The skill is appropriate for checking the
+SPA entry document, metadata, semantic headings, canonical/indexation controls,
+responsive behavior, image/resource loading, and structured data eligibility.
+
+SEO findings must remain evidence-based: source and HTTP checks can verify the
+technical configuration, while actual indexing, ranking, and Core Web Vitals
+outcomes require rendered-page measurements and, where applicable, Search
+Console or field data.
