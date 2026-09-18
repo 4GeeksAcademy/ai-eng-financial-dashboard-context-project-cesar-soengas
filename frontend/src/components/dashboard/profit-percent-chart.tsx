@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { type MonthlyDataPoint } from '@/lib/financial-types'
@@ -62,7 +63,7 @@ export function ProfitPercentChart({ data, loading }: ProfitPercentChartProps) {
     )
   }
 
-  const hasData = data.some((d) => d.profitPercent !== 0)
+  const hasData = useMemo(() => data.some((d) => d.profitPercent !== 0), [data])
 
   return (
     <Card className="border-border/60">

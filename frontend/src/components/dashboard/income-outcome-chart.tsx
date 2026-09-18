@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { type MonthlyDataPoint } from '@/lib/financial-types'
@@ -61,7 +62,7 @@ export function IncomeOutcomeChart({ data, loading }: IncomeOutcomeChartProps) {
     )
   }
 
-  const hasData = data.some((d) => d.income > 0 || d.outcome > 0)
+  const hasData = useMemo(() => data.some((d) => d.income > 0 || d.outcome > 0), [data])
 
   return (
     <Card className="border-border/60">
