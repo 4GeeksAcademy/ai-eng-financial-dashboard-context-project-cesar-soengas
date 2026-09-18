@@ -49,7 +49,7 @@ applyTo:
 - **Never hardcode colors** — use CSS variables from `index.css`:
   ```tsx
   // ✅ Correct
-  className="bg-[var(--income-badge)] text-[var(--income-badge-fg)]"
+  className="bg-(--income-badge) text-(--income-badge-fg)"
   // ❌ Wrong
   className="bg-green-100 text-green-800"
   ```
